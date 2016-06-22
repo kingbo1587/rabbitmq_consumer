@@ -10,9 +10,9 @@ import com.rabbitmq.client.Consumer;
 import com.rabbitmq.client.DefaultConsumer;
 import com.rabbitmq.client.Envelope;
 
-public class Recv {
+public class ReceiveLogsTopic {
 
-	private static final String QUEUE_NAME = "hello";
+	private static final String EXCHANGE_NAME = "topic_logs";
 
 	public static void main(String[] args) throws Exception {
 		ConnectionFactory factory = new ConnectionFactory();
@@ -20,21 +20,31 @@ public class Recv {
 		Connection connection = factory.newConnection();
 		Channel channel = connection.createChannel();
 
-		channel.queueDeclare(QUEUE_NAME, false, false, false, null);
-		System.out.println(" [*] Waiting for messages. To exit press CTRL+C");
-		Consumer consumer = new DefaultConsumer(channel){
+		String queueName = channel.queueDeclare().getQueue();
 
+		if (args.length < 1) {
+			System.err.println("Usage: ReceiveLogsTopic [binding_key]...");
+			System.exit(1);
+		}
+
+		for (String routingKey : args) {
+			channel.queueBind(queueName, EXCHANGE_NAME, routingKey);
+		}
+
+		System.out.println(" [*] Waiting for messages. To exit press CTRL+C");
+
+		Consumer consumer = new DefaultConsumer(channel) {
 			@Override
 			public void handleDelivery(String consumerTag, Envelope envelope, BasicProperties properties, byte[] body)
 					throws IOException {
 				String message = new String(body, "UTF-8");
-				System.out.println(" [x] Recived '"+message+"'");
+				System.out.println(" [x] Received '" + envelope.getRoutingKey() + "':'" + message + "'");
 			}
-			
 		};
-		channel.basicConsume(QUEUE_NAME, true, consumer);
-		
+		channel.basicConsume(queueName, true, consumer);
+
 		channel.close();
 		connection.close();
 	}
+
 }
